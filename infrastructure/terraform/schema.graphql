@@ -1,0 +1,162 @@
+# GraphQL Schema for AppSync
+# This file is used by Terraform to create the AppSync API
+
+enum ApplicationType {
+  oral
+  IV
+  topical
+  surgical
+}
+
+enum TreatmentType {
+  holistic
+  symptom_based
+}
+
+enum SettingType {
+  hospital
+  clinic
+  home
+}
+
+type SideEffect {
+  id: ID!
+  name: String!
+  description: String
+  duration: Int!
+  intensity: Int!
+  severity: Int!
+}
+
+type Treatment {
+  id: ID!
+  name: String!
+  description: String
+  application: ApplicationType!
+  efficacy: Int!
+  duration: Int!
+  intensity: Int!
+  type: TreatmentType!
+  sideEffects: [SideEffect!]!
+  setting: SettingType!
+  isPreventative: Boolean!
+  isPalliative: Boolean!
+  isCurative: Boolean!
+}
+
+type Diagnostic {
+  id: ID!
+  name: String!
+  description: String
+  efficacy: Int!
+  duration: Int!
+  intensity: Int!
+  type: TreatmentType!
+  sideEffects: [SideEffect!]!
+  setting: SettingType!
+}
+
+type AilmentDetails {
+  name: String!
+  description: String
+  duration: Int!
+  intensity: Int!
+  severity: Int!
+}
+
+type Ailment {
+  id: ID!
+  ailment: AilmentDetails!
+  treatments: [Treatment!]!
+  diagnostics: [Diagnostic!]!
+}
+
+type DeleteResponse {
+  id: ID!
+  success: Boolean!
+  message: String
+}
+
+input SideEffectInput {
+  id: ID
+  name: String!
+  description: String
+  duration: Int!
+  intensity: Int!
+  severity: Int!
+}
+
+input TreatmentInput {
+  id: ID
+  name: String!
+  description: String
+  application: ApplicationType!
+  efficacy: Int!
+  duration: Int!
+  intensity: Int!
+  type: TreatmentType!
+  sideEffects: [SideEffectInput!]
+  setting: SettingType!
+  isPreventative: Boolean!
+  isPalliative: Boolean!
+  isCurative: Boolean!
+}
+
+input DiagnosticInput {
+  id: ID
+  name: String!
+  description: String
+  efficacy: Int!
+  duration: Int!
+  intensity: Int!
+  type: TreatmentType!
+  sideEffects: [SideEffectInput!]
+  setting: SettingType!
+}
+
+input AilmentDetailsInput {
+  name: String!
+  description: String
+  duration: Int!
+  intensity: Int!
+  severity: Int!
+}
+
+input CreateAilmentInput {
+  id: ID
+  ailment: AilmentDetailsInput!
+  treatments: [TreatmentInput!]
+  diagnostics: [DiagnosticInput!]
+}
+
+input UpdateAilmentInput {
+  ailment: AilmentDetailsInput
+  treatments: [TreatmentInput!]
+  diagnostics: [DiagnosticInput!]
+}
+
+type Query {
+  getAilments: [Ailment!]!
+  getAilment(id: ID!): Ailment
+}
+
+type Mutation {
+  createAilment(input: CreateAilmentInput!): Ailment!
+  updateAilment(id: ID!, input: UpdateAilmentInput!): Ailment
+  deleteAilment(id: ID!): DeleteResponse!
+}
+
+type Subscription {
+  ailmentCreated: Ailment
+    @aws_subscribe(mutations: ["createAilment"])
+  ailmentUpdated: Ailment
+    @aws_subscribe(mutations: ["updateAilment"])
+  ailmentDeleted: DeleteResponse
+    @aws_subscribe(mutations: ["deleteAilment"])
+}
+
+schema {
+  query: Query
+  mutation: Mutation
+  subscription: Subscription
+}

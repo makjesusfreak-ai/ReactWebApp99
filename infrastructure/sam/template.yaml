@@ -1,0 +1,193 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Ailment Tracker - Serverless Backend
+  SAM template for DynamoDB, Lambda, and API Gateway
+
+Globals:
+  Function:
+    Timeout: 30
+    Runtime: nodejs18.x
+    MemorySize: 256
+    Environment:
+      Variables:
+        DYNAMODB_TABLE: !Ref AilmentTable
+        NODE_ENV: !Ref Environment
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - staging
+      - prod
+    Description: Environment name
+
+  ProjectName:
+    Type: String
+    Default: ailment-tracker
+    Description: Project name for resource naming
+
+Resources:
+  # DynamoDB Table
+  AilmentTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub ${ProjectName}-${Environment}-Ailment
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: ailmentName
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: ailment-name-index
+          KeySchema:
+            - AttributeName: ailmentName
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+      StreamSpecification:
+        StreamViewType: NEW_AND_OLD_IMAGES
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Project
+          Value: !Ref ProjectName
+        - Key: Environment
+          Value: !Ref Environment
+
+  # Lambda Function for CRUD operations
+  AilmentFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${ProjectName}-${Environment}-ailment-handler
+      CodeUri: lambda/
+      Handler: index.handler
+      Description: Handles CRUD operations for ailments
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref AilmentTable
+      Events:
+        GetAilments:
+          Type: Api
+          Properties:
+            Path: /ailments
+            Method: GET
+            RestApiId: !Ref AilmentApi
+        GetAilment:
+          Type: Api
+          Properties:
+            Path: /ailments/{id}
+            Method: GET
+            RestApiId: !Ref AilmentApi
+        CreateAilment:
+          Type: Api
+          Properties:
+            Path: /ailments
+            Method: POST
+            RestApiId: !Ref AilmentApi
+        UpdateAilment:
+          Type: Api
+          Properties:
+            Path: /ailments/{id}
+            Method: PUT
+            RestApiId: !Ref AilmentApi
+        DeleteAilment:
+          Type: Api
+          Properties:
+            Path: /ailments/{id}
+            Method: DELETE
+            RestApiId: !Ref AilmentApi
+
+  # DynamoDB Stream Handler for real-time sync
+  StreamHandlerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub ${ProjectName}-${Environment}-stream-handler
+      CodeUri: lambda/
+      Handler: stream.handler
+      Description: Handles DynamoDB stream events for real-time sync
+      Policies:
+        - DynamoDBStreamReadPolicy:
+            TableName: !Ref AilmentTable
+            StreamName: !GetAtt AilmentTable.StreamArn
+        - Statement:
+            - Effect: Allow
+              Action:
+                - appsync:GraphQL
+              Resource: '*'
+      Events:
+        Stream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt AilmentTable.StreamArn
+            StartingPosition: TRIM_HORIZON
+            BatchSize: 10
+            MaximumBatchingWindowInSeconds: 5
+
+  # API Gateway
+  AilmentApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: !Sub ${ProjectName}-${Environment}-api
+      StageName: !Ref Environment
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,Authorization,X-Api-Key'"
+        AllowOrigin: "'*'"
+      Auth:
+        ApiKeyRequired: false
+      Tags:
+        Project: !Ref ProjectName
+        Environment: !Ref Environment
+
+  # CloudWatch Log Group
+  AilmentFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${AilmentFunction}
+      RetentionInDays: 14
+
+  StreamHandlerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub /aws/lambda/${StreamHandlerFunction}
+      RetentionInDays: 14
+
+Outputs:
+  AilmentTableName:
+    Description: DynamoDB table name
+    Value: !Ref AilmentTable
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-AilmentTableName
+
+  AilmentTableArn:
+    Description: DynamoDB table ARN
+    Value: !GetAtt AilmentTable.Arn
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-AilmentTableArn
+
+  AilmentTableStreamArn:
+    Description: DynamoDB stream ARN
+    Value: !GetAtt AilmentTable.StreamArn
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-AilmentTableStreamArn
+
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub https://${AilmentApi}.execute-api.${AWS::Region}.amazonaws.com/${Environment}
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-ApiEndpoint
+
+  AilmentFunctionArn:
+    Description: Lambda function ARN
+    Value: !GetAtt AilmentFunction.Arn
+    Export:
+      Name: !Sub ${ProjectName}-${Environment}-AilmentFunctionArn

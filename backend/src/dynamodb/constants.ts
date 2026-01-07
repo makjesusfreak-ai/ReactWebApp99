@@ -1,0 +1,1 @@
+export const DYNAMODB_CLIENT = 'DYNAMODB_CLIENT';

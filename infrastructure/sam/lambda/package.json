@@ -1,0 +1,11 @@
+{
+  "name": "ailment-lambda",
+  "version": "1.0.0",
+  "description": "Lambda functions for Ailment Tracker",
+  "main": "index.js",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.476.0",
+    "@aws-sdk/lib-dynamodb": "^3.476.0",
+    "uuid": "^9.0.1"
+  }
+}

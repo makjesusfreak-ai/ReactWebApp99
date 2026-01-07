@@ -1,0 +1,185 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+}
+
+/* AG-Grid Custom Styles - Modern Theme */
+.ag-theme-alpine {
+  --ag-font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --ag-font-size: 13px;
+  --ag-header-background-color: #f8fafc;
+  --ag-header-foreground-color: #475569;
+  --ag-header-cell-hover-background-color: #f1f5f9;
+  --ag-odd-row-background-color: #ffffff;
+  --ag-row-hover-color: #f1f5f9;
+  --ag-selected-row-background-color: #eff6ff;
+  --ag-border-color: #e2e8f0;
+  --ag-row-border-color: #f1f5f9;
+  --ag-cell-horizontal-padding: 12px;
+  --ag-header-height: 44px;
+  --ag-row-height: 44px;
+}
+
+.ag-theme-alpine .ag-header {
+  border-bottom: 2px solid #e2e8f0;
+}
+
+.ag-theme-alpine .ag-header-cell {
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ag-theme-alpine .ag-cell {
+  display: flex;
+  align-items: center;
+  border-right: 1px solid #f1f5f9;
+}
+
+.ag-theme-alpine .ag-row {
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.ag-theme-alpine .ag-row:hover {
+  background-color: #f8fafc !important;
+}
+
+.ag-theme-alpine .ag-cell-inline-editing {
+  padding: 0;
+  background-color: #eff6ff;
+  box-shadow: inset 0 0 0 2px #6366f1;
+  border-radius: 4px;
+}
+
+.ag-theme-alpine .ag-cell-inline-editing input,
+.ag-theme-alpine .ag-cell-inline-editing select {
+  height: 100%;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+}
+
+.ag-theme-alpine .ag-cell-inline-editing input:focus,
+.ag-theme-alpine .ag-cell-inline-editing select:focus {
+  outline: none;
+}
+
+/* Nested row styles */
+.nested-row-level-1 {
+  background-color: #f8fafc !important;
+}
+
+.nested-row-level-1:hover {
+  background-color: #f1f5f9 !important;
+}
+
+.nested-row-level-2 {
+  background-color: #fefce8 !important;
+}
+
+.nested-row-level-2:hover {
+  background-color: #fef9c3 !important;
+}
+
+/* Scrollbar styling */
+.ag-theme-alpine .ag-body-horizontal-scroll,
+.ag-theme-alpine .ag-body-vertical-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+.ag-theme-alpine ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.ag-theme-alpine ::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.ag-theme-alpine ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.ag-theme-alpine ::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Action buttons */
+.action-button {
+  @apply px-2 py-1 text-xs rounded mr-1 transition-colors;
+}
+
+.action-button-add {
+  @apply bg-green-500 text-white hover:bg-green-600;
+}
+
+.action-button-delete {
+  @apply bg-red-500 text-white hover:bg-red-600;
+}
+
+.action-button-save {
+  @apply bg-blue-500 text-white hover:bg-blue-600;
+}
+
+/* Navigation */
+.nav-link {
+  @apply px-4 py-2 rounded-lg transition-colors;
+}
+
+.nav-link:hover {
+  @apply bg-gray-100;
+}
+
+.nav-link.active {
+  @apply bg-blue-500 text-white;
+}
+
+/* Loading spinner */
+.spinner {
+  @apply animate-spin h-8 w-8 border-4 border-blue-500 border-t-transparent rounded-full;
+}
+
+/* Toast notifications */
+.toast {
+  @apply fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg z-50 transition-all;
+}
+
+.toast-success {
+  @apply bg-green-500 text-white;
+}
+
+.toast-error {
+  @apply bg-red-500 text-white;
+}
+
+.toast-info {
+  @apply bg-blue-500 text-white;
+}

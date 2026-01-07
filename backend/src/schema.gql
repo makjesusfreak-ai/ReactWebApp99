@@ -1,0 +1,153 @@
+# ------------------------------------------------------
+# THIS FILE WAS AUTOMATICALLY GENERATED (DO NOT MODIFY)
+# ------------------------------------------------------
+
+type Ailment {
+  ailment: AilmentDetails!
+  diagnostics: [Diagnostic!]!
+  id: ID!
+  treatments: [Treatment!]!
+}
+
+type AilmentDetails {
+  description: String
+  duration: Int!
+  intensity: Int!
+  name: String!
+  severity: Int!
+}
+
+input AilmentDetailsInput {
+  description: String
+  duration: Int!
+  intensity: Int!
+  name: String!
+  severity: Int!
+}
+
+enum ApplicationType {
+  IV
+  ORAL
+  SURGICAL
+  TOPICAL
+}
+
+input CreateAilmentInput {
+  ailment: AilmentDetailsInput!
+  diagnostics: [DiagnosticInput!]
+  id: ID
+  treatments: [TreatmentInput!]
+}
+
+type DeleteResponse {
+  message: String
+  success: Boolean!
+}
+
+type Diagnostic {
+  description: String
+  duration: Int!
+  efficacy: Int!
+  id: ID!
+  intensity: Int!
+  name: String!
+  setting: SettingType!
+  sideEffects: [SideEffect!]!
+  type: TreatmentType!
+}
+
+input DiagnosticInput {
+  description: String
+  duration: Int!
+  efficacy: Int!
+  id: ID
+  intensity: Int!
+  name: String!
+  setting: String!
+  sideEffects: [SideEffectInput!]
+  type: String!
+}
+
+type Mutation {
+  createAilment(input: CreateAilmentInput!): Ailment!
+  deleteAilment(id: ID!): DeleteResponse!
+  updateAilment(id: ID!, input: UpdateAilmentInput!): Ailment
+}
+
+type Query {
+  getAilment(id: ID!): Ailment
+  getAilments: [Ailment!]!
+}
+
+enum SettingType {
+  CLINIC
+  HOME
+  HOSPITAL
+}
+
+type SideEffect {
+  description: String
+  duration: Int!
+  id: ID!
+  intensity: Int!
+  name: String!
+  severity: Int!
+}
+
+input SideEffectInput {
+  description: String
+  duration: Int!
+  id: ID
+  intensity: Int!
+  name: String!
+  severity: Int!
+}
+
+type Subscription {
+  ailmentCreated: Ailment!
+  ailmentDeleted: DeleteResponse!
+  ailmentUpdated: Ailment!
+}
+
+type Treatment {
+  application: ApplicationType!
+  description: String
+  duration: Int!
+  efficacy: Int!
+  id: ID!
+  intensity: Int!
+  isCurative: Boolean!
+  isPalliative: Boolean!
+  isPreventative: Boolean!
+  name: String!
+  setting: SettingType!
+  sideEffects: [SideEffect!]!
+  type: TreatmentType!
+}
+
+input TreatmentInput {
+  application: String!
+  description: String
+  duration: Int!
+  efficacy: Int!
+  id: ID
+  intensity: Int!
+  isCurative: Boolean!
+  isPalliative: Boolean!
+  isPreventative: Boolean!
+  name: String!
+  setting: String!
+  sideEffects: [SideEffectInput!]
+  type: String!
+}
+
+enum TreatmentType {
+  HOLISTIC
+  SYMPTOM_BASED
+}
+
+input UpdateAilmentInput {
+  ailment: AilmentDetailsInput
+  diagnostics: [DiagnosticInput!]
+  treatments: [TreatmentInput!]
+}
