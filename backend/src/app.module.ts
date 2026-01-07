@@ -5,7 +5,6 @@ import { ApolloDriver, ApolloDriverConfig } from '@nestjs/apollo';
 import { join } from 'path';
 import { AilmentModule } from './ailment/ailment.module';
 import { DynamoDBModule } from './dynamodb/dynamodb.module';
-import { RedisModule } from './redis/redis.module';
 import { PubSubModule } from './pubsub/pubsub.module';
 
 @Module({
@@ -36,7 +35,6 @@ import { PubSubModule } from './pubsub/pubsub.module';
 
     // Feature modules
     DynamoDBModule,
-    RedisModule,
     PubSubModule,
     AilmentModule,
   ],

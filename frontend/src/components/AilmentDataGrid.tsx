@@ -42,6 +42,7 @@ import {
   deepClone,
 } from '@/utils';
 import { ConfirmModal } from './ConfirmModal';
+import { MobileAilmentModal } from './MobileAilmentModal';
 
 // Register AG-Grid modules
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
@@ -82,7 +83,6 @@ interface AilmentDataGridProps {
   onSaveAilment: (ailment: Ailment) => Promise<void>;
   onDeleteAilment: (id: string) => Promise<void>;
   onRefresh?: () => void;
-  loading?: boolean;
 }
 
 // Duration cell editor component
@@ -466,12 +466,19 @@ export const AilmentDataGrid: React.FC<AilmentDataGridProps> = ({
   onSaveAilment,
   onDeleteAilment,
   onRefresh,
-  loading = false,
 }) => {
   const gridRef = useRef<AgGridReact>(null);
   const [gridApi, setGridApi] = useState<GridApi | null>(null);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [pendingChanges, setPendingChanges] = useState<Map<string, Ailment>>(new Map());
+  
+  // Mobile state
+  const [isMobile, setIsMobile] = useState(false);
+  const [mobileModalOpen, setMobileModalOpen] = useState(false);
+  const [selectedAilment, setSelectedAilment] = useState<Ailment | null>(null);
+  const [modalInitialTab, setModalInitialTab] = useState<'details' | 'treatments' | 'diagnostics'>('details');
+  const [modalInitialExpandedId, setModalInitialExpandedId] = useState<string | undefined>(undefined);
+  const [scrollToSideEffectId, setScrollToSideEffectId] = useState<string | undefined>(undefined);
   
   // Delete confirmation modal state
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -480,6 +487,16 @@ export const AilmentDataGrid: React.FC<AilmentDataGridProps> = ({
     itemName: string;
     itemType: string;
   }>({ isOpen: false, rowData: null, itemName: '', itemType: '' });
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Convert hierarchical ailment data to flat grid rows
   const flattenAilments = useCallback(
@@ -612,6 +629,31 @@ export const AilmentDataGrid: React.FC<AilmentDataGridProps> = ({
       }
       return next;
     });
+  }, []);
+
+  // Track if all rows are expanded
+  const [allExpanded, setAllExpanded] = useState(false);
+
+  // Expand all rows at all levels
+  const handleExpandAll = useCallback(() => {
+    const allIds = new Set<string>();
+    ailments.forEach((ailment) => {
+      allIds.add(ailment.id);
+      ailment.treatments.forEach((treatment) => {
+        allIds.add(treatment.id);
+      });
+      ailment.diagnostics.forEach((diagnostic) => {
+        allIds.add(diagnostic.id);
+      });
+    });
+    setExpandedRows(allIds);
+    setAllExpanded(true);
+  }, [ailments]);
+
+  // Collapse all rows
+  const handleCollapseAll = useCallback(() => {
+    setExpandedRows(new Set());
+    setAllExpanded(false);
   }, []);
 
   // Handle boolean field toggle (single-click checkbox)
@@ -973,6 +1015,47 @@ export const AilmentDataGrid: React.FC<AilmentDataGridProps> = ({
     [pendingChanges, onSaveAilment]
   );
 
+  // Handle row click on mobile
+  const handleRowClick = useCallback((event: any) => {
+    if (!isMobile || !event.data) return;
+    
+    const rowData = event.data as GridRowData;
+    const originalAilment = rowData._originalAilment;
+    
+    if (!originalAilment) return;
+    
+    setSelectedAilment(originalAilment);
+    setScrollToSideEffectId(undefined);
+    
+    switch (rowData.rowType) {
+      case 'ailment':
+        setModalInitialTab('details');
+        setModalInitialExpandedId(undefined);
+        break;
+      case 'treatment':
+        setModalInitialTab('treatments');
+        setModalInitialExpandedId(rowData.id);
+        break;
+      case 'diagnostic':
+        setModalInitialTab('diagnostics');
+        setModalInitialExpandedId(rowData.id);
+        break;
+      case 'sideEffect':
+        // Navigate to the parent (treatment or diagnostic) and scroll to side effect
+        if (rowData.parentType === 'treatment') {
+          setModalInitialTab('treatments');
+          setModalInitialExpandedId(rowData.parentId);
+        } else if (rowData.parentType === 'diagnostic') {
+          setModalInitialTab('diagnostics');
+          setModalInitialExpandedId(rowData.parentId);
+        }
+        setScrollToSideEffectId(rowData.id);
+        break;
+    }
+    
+    setMobileModalOpen(true);
+  }, [isMobile]);
+
   // Column definitions
   const columnDefs: ColDef[] = useMemo(
     () => [
@@ -980,7 +1063,8 @@ export const AilmentDataGrid: React.FC<AilmentDataGridProps> = ({
         headerName: '',
         field: 'actions',
         width: 200,
-        pinned: 'left',
+        pinned: 'left' as const,
+        hide: isMobile,
         cellRenderer: ActionCellRenderer,
         cellRendererParams: {
           onAdd: handleAddChild,
@@ -996,7 +1080,7 @@ export const AilmentDataGrid: React.FC<AilmentDataGridProps> = ({
       {
         headerName: 'Type',
         field: 'rowType',
-        width: 120,
+        width: 140,
         editable: false,
         cellRenderer: (params: ICellRendererParams) => {
           const typeStyles: Record<string, { bg: string; text: string; border: string; icon: string }> = {
@@ -1089,7 +1173,7 @@ export const AilmentDataGrid: React.FC<AilmentDataGridProps> = ({
         headerName: 'Severity',
         field: 'severity',
         width: 130,
-        editable: (params) =>
+        editable: (params: any) =>
           params.data?.rowType === 'ailment' || params.data?.rowType === 'sideEffect',
         cellEditor: 'agNumberCellEditor',
         cellEditorParams: { min: 0, max: 100 },
@@ -1111,7 +1195,7 @@ export const AilmentDataGrid: React.FC<AilmentDataGridProps> = ({
         headerName: 'Efficacy',
         field: 'efficacy',
         width: 130,
-        editable: (params) =>
+        editable: (params: any) =>
           params.data?.rowType === 'treatment' || params.data?.rowType === 'diagnostic',
         cellEditor: 'agNumberCellEditor',
         cellEditorParams: { min: 0, max: 100 },
@@ -1218,8 +1302,11 @@ export const AilmentDataGrid: React.FC<AilmentDataGridProps> = ({
           onToggle: handleBooleanToggle,
         },
       },
-    ],
-    [handleAddChild, handleDeleteRow, handleToggleExpand, handleBooleanToggle, handleSelectChange, expandedRows]
+    ].map(col => ({
+      ...col,
+      editable: isMobile ? false : col.editable,
+    })),
+    [handleAddChild, handleDeleteRow, handleToggleExpand, handleBooleanToggle, handleSelectChange, expandedRows, isMobile]
   );
 
   const defaultColDef: ColDef = useMemo(
@@ -1247,65 +1334,139 @@ export const AilmentDataGrid: React.FC<AilmentDataGridProps> = ({
   // Add new ailment
   const handleAddAilment = useCallback(() => {
     const newAilment = createNewAilment();
-    onSaveAilment(newAilment);
-  }, [onSaveAilment]);
+    if (isMobile) {
+      setSelectedAilment(newAilment);
+      setMobileModalOpen(true);
+    } else {
+      onSaveAilment(newAilment);
+    }
+  }, [onSaveAilment, isMobile]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full w-full max-w-full overflow-x-hidden">
       {/* Header Section */}
-      <div className="flex items-center mb-6 px-1">
-        {/* Left side - Buttons */}
-        <div className="flex items-center gap-3">
-          {onRefresh && (
+      {isMobile ? (
+        <div className="flex flex-col gap-3 mb-6 px-1 w-full">
+          {/* Title first on mobile */}
+          <div className="w-full text-center">
+            <h2 className="text-xl font-bold text-slate-800">Ailment Management</h2>
+          </div>
+          {/* Buttons below title on mobile */}
+          <div className="flex items-center gap-2 w-full">
             <button
-              onClick={onRefresh}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-white text-slate-600 border border-slate-300 
+              onClick={allExpanded ? handleCollapseAll : handleExpandAll}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-white text-slate-600 border border-slate-300 
                          rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors duration-150 
                          font-medium text-sm shadow-sm"
-              title="Refresh data from server"
+              title={allExpanded ? 'Collapse all rows' : 'Expand all rows'}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                      d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                {allExpanded ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                )}
               </svg>
-              Refresh
+              {allExpanded ? 'Collapse' : 'Expand'}
             </button>
-          )}
-          <button
-            onClick={handleAddAilment}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg 
-                       hover:bg-indigo-700 transition-colors duration-150 font-medium text-sm shadow-sm"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Ailment
-          </button>
-        </div>
-        
-        {/* Center - Title */}
-        <div className="flex-1 text-center">
-          <h2 className="text-2xl font-bold text-slate-800">Ailment Management</h2>
-          <p className="text-sm text-slate-500 mt-1">Manage ailments, treatments, diagnostics, and side effects</p>
-        </div>
-        
-        {/* Right side - Status indicator */}
-        <div className="flex items-center gap-3">
-          {pendingChanges.size > 0 && (
-            <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-sm font-medium">
-              <svg className="w-4 h-4 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-white text-slate-600 border border-slate-300 
+                           rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors duration-150 
+                           font-medium text-sm shadow-sm"
+                title="Refresh data from server"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </button>
+            )}
+            <button
+              onClick={handleAddAilment}
+              className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg 
+                         hover:bg-indigo-700 transition-colors duration-150 font-medium text-sm shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              {pendingChanges.size} saving...
-            </span>
-          )}
-          {/* Spacer to balance the left buttons */}
-          {pendingChanges.size === 0 && <div className="w-[200px]"></div>}
+              Add
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="flex items-center mb-6 px-1">
+          {/* Desktop layout - buttons on left */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={allExpanded ? handleCollapseAll : handleExpandAll}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-white text-slate-600 border border-slate-300 
+                         rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors duration-150 
+                         font-medium text-sm shadow-sm"
+              title={allExpanded ? 'Collapse all rows' : 'Expand all rows'}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                {allExpanded ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                )}
+              </svg>
+              {allExpanded ? 'Collapse All' : 'Expand All'}
+            </button>
+            {onRefresh && (
+              <button
+                onClick={onRefresh}
+                className="inline-flex items-center gap-2 px-3 py-2 bg-white text-slate-600 border border-slate-300 
+                           rounded-lg hover:bg-slate-50 hover:border-slate-400 transition-colors duration-150 
+                           font-medium text-sm shadow-sm"
+                title="Refresh data from server"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
+                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh
+              </button>
+            )}
+            <button
+              onClick={handleAddAilment}
+              className="inline-flex items-center gap-2 px-3 py-2 bg-indigo-600 text-white rounded-lg 
+                         hover:bg-indigo-700 transition-colors duration-150 font-medium text-sm shadow-sm"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Ailment
+            </button>
+          </div>
+          
+          {/* Center - Title */}
+          <div className="flex-1 text-center">
+            <h2 className="text-2xl font-bold text-slate-800">Ailment Management</h2>
+            <p className="text-sm text-slate-500 mt-1">Manage ailments, treatments, diagnostics, and side effects</p>
+          </div>
+          
+          {/* Right side - Status indicator */}
+          <div className="flex items-center gap-3">
+            {pendingChanges.size > 0 && (
+              <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-lg text-sm font-medium">
+                <svg className="w-4 h-4 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                </svg>
+                {pendingChanges.size} saving...
+              </span>
+            )}
+            {/* Spacer to balance the left buttons */}
+            {pendingChanges.size === 0 && <div className="w-[200px]"></div>}
+          </div>
+        </div>
+      )}
 
       {/* Grid Container */}
-      <div className="flex-1 ag-theme-alpine rounded-lg border border-slate-200 overflow-hidden shadow-sm">
+      <div className="flex-1 ag-theme-alpine rounded-lg border border-slate-200 overflow-hidden shadow-sm w-full max-w-full">
         <AgGridReact
           ref={gridRef}
           rowData={rowData}
@@ -1316,26 +1477,19 @@ export const AilmentDataGrid: React.FC<AilmentDataGridProps> = ({
           onGridReady={onGridReady}
           onCellEditingStopped={handleCellEditingStopped}
           onCellKeyDown={handleCellKeyDown}
-          singleClickEdit={true}
+          onRowClicked={handleRowClick}
+          singleClickEdit={!isMobile}
           stopEditingWhenCellsLoseFocus={true}
           enableCellTextSelection={true}
           suppressRowClickSelection={true}
-          animateRows={true}
+          animateRows={false}
+          suppressLoadingOverlay={true}
+          suppressNoRowsOverlay={true}
           domLayout="autoHeight"
         />
       </div>
 
-      {loading && (
-        <div className="fixed inset-0 bg-slate-900/20 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl shadow-2xl p-6 flex items-center gap-4">
-            <svg className="w-8 h-8 animate-spin text-indigo-600" fill="none" viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"/>
-            </svg>
-            <span className="text-slate-700 font-medium">Loading...</span>
-          </div>
-        </div>
-      )}
+
 
       {/* Delete Confirmation Modal */}
       <ConfirmModal
@@ -1353,6 +1507,38 @@ export const AilmentDataGrid: React.FC<AilmentDataGridProps> = ({
         }}
       />
 
+      {/* Mobile Modal */}
+      <MobileAilmentModal
+        isOpen={mobileModalOpen}
+        ailment={selectedAilment}
+        onClose={() => {
+          setMobileModalOpen(false);
+          setSelectedAilment(null);
+          setModalInitialTab('details');
+          setModalInitialExpandedId(undefined);
+          setScrollToSideEffectId(undefined);
+        }}
+        onSave={async (ailment) => {
+          await onSaveAilment(ailment);
+          setMobileModalOpen(false);
+          setSelectedAilment(null);
+          setModalInitialTab('details');
+          setModalInitialExpandedId(undefined);
+          setScrollToSideEffectId(undefined);
+        }}
+        onDelete={async (id) => {
+          await onDeleteAilment(id);
+          setMobileModalOpen(false);
+          setSelectedAilment(null);
+          setModalInitialTab('details');
+          setModalInitialExpandedId(undefined);
+          setScrollToSideEffectId(undefined);
+        }}
+        initialTab={modalInitialTab}
+        initialExpandedId={modalInitialExpandedId}
+        scrollToSideEffectId={scrollToSideEffectId}
+      />
+
       {/* Tips Section */}
       <div className="mt-6 p-4 bg-gradient-to-r from-slate-50 to-slate-100 rounded-lg border border-slate-200">
         <div className="flex items-start gap-3">
@@ -1364,22 +1550,38 @@ export const AilmentDataGrid: React.FC<AilmentDataGridProps> = ({
           <div>
             <h4 className="font-semibold text-slate-800 text-sm">Quick Tips</h4>
             <ul className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-1 text-sm text-slate-600">
-              <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
-                Click any cell to edit directly
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
-                <kbd className="px-1.5 py-0.5 bg-white rounded border border-slate-300 text-xs font-mono">Tab</kbd> to move between cells
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
-                Use <span className="font-medium text-emerald-600">+T</span>, <span className="font-medium text-emerald-600">+D</span>, <span className="font-medium text-emerald-600">+S</span> to add items
-              </li>
-              <li className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
-                Click <span className="font-medium text-indigo-600">▶</span> to expand nested rows
-              </li>
+              {!isMobile && (
+                <>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                    Click any cell to edit directly
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                    <kbd className="px-1.5 py-0.5 bg-white rounded border border-slate-300 text-xs font-mono">Tab</kbd> to move between cells
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                    Use <span className="font-medium text-emerald-600">+T</span>, <span className="font-medium text-emerald-600">+D</span>, <span className="font-medium text-emerald-600">+S</span> to add items
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                    Click <span className="font-medium text-indigo-600">▶</span> to expand nested rows
+                  </li>
+                </>
+              )}
+              {isMobile && (
+                <>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                    Tap any ailment to view and edit
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>
+                    Manage treatments and diagnostics in the modal
+                  </li>
+                </>
+              )}
             </ul>
           </div>
         </div>

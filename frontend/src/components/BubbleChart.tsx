@@ -4,7 +4,6 @@ import React, { useLayoutEffect, useRef, useEffect, useState } from 'react';
 import * as am5 from '@amcharts/amcharts5';
 import * as am5xy from '@amcharts/amcharts5/xy';
 import * as am5percent from '@amcharts/amcharts5/percent';
-import am5themes_Animated from '@amcharts/amcharts5/themes/Animated';
 import { Ailment, BubbleChartDataPoint } from '@/types';
 import { formatDuration, getTopTreatment } from '@/utils';
 
@@ -47,10 +46,7 @@ export const BubbleChart: React.FC<BubbleChartProps> = ({ ailments }) => {
     const root = am5.Root.new(chartRef.current);
     rootRef.current = root;
 
-    // Set themes
-    root.setThemes([am5themes_Animated.new(root)]);
-
-    // Create chart
+    // Create chart without animated theme for instant rendering
     const chart = root.container.children.push(
       am5xy.XYChart.new(root, {
         panX: true,
@@ -349,10 +345,6 @@ export const BubbleChart: React.FC<BubbleChartProps> = ({ ailments }) => {
     legend.markers.template.adapters.add('forceHidden', (hidden, target) => {
       return false;
     });
-
-    // Animate on load
-    series.appear(1000);
-    chart.appear(1000, 100);
 
     return () => {
       root.dispose();

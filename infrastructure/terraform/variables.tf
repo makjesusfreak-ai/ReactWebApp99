@@ -22,18 +22,6 @@ variable "dynamodb_table_name" {
   default     = "Ailment"
 }
 
-variable "redis_node_type" {
-  description = "ElastiCache Redis node type"
-  type        = string
-  default     = "cache.t3.micro"
-}
-
-variable "redis_num_cache_nodes" {
-  description = "Number of Redis cache nodes"
-  type        = number
-  default     = 1
-}
-
 variable "appsync_auth_type" {
   description = "AppSync authentication type"
   type        = string

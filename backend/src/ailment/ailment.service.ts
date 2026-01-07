@@ -1,38 +1,22 @@
 import { Injectable } from '@nestjs/common';
 import { v4 as uuidv4 } from 'uuid';
 import { DynamoDBService } from '../dynamodb/dynamodb.service';
-import { RedisService } from '../redis/redis.service';
 import { Ailment, SideEffect, Treatment, Diagnostic } from './entities';
 import { CreateAilmentInput, UpdateAilmentInput } from './dto';
 
 @Injectable()
 export class AilmentService {
-  private readonly CACHE_TTL = 300; // 5 minutes
-
   constructor(
     private readonly dynamoDBService: DynamoDBService,
-    private readonly redisService: RedisService,
   ) {}
 
   async findAll(): Promise<Ailment[]> {
-    return this.redisService.getOrSet<Ailment[]>(
-      'ailments:all',
-      async () => {
-        const ailments = await this.dynamoDBService.scan<Ailment>();
-        return ailments || [];
-      },
-      this.CACHE_TTL,
-    );
+    const ailments = await this.dynamoDBService.scan<Ailment>();
+    return ailments || [];
   }
 
   async findOne(id: string): Promise<Ailment | null> {
-    return this.redisService.getOrSet<Ailment | null>(
-      `ailment:${id}`,
-      async () => {
-        return this.dynamoDBService.getItem<Ailment>(id);
-      },
-      this.CACHE_TTL,
-    );
+    return this.dynamoDBService.getItem<Ailment>(id);
   }
 
   async create(input: CreateAilmentInput): Promise<Ailment> {
@@ -50,7 +34,6 @@ export class AilmentService {
     };
 
     await this.dynamoDBService.putItem(ailment);
-    await this.redisService.invalidateAilmentCache();
 
     return ailment;
   }
@@ -81,17 +64,12 @@ export class AilmentService {
     };
 
     await this.dynamoDBService.putItem(updated);
-    await this.redisService.invalidateAilmentCache(id);
 
     return updated;
   }
 
   async delete(id: string): Promise<boolean> {
-    const result = await this.dynamoDBService.deleteItem(id);
-    if (result) {
-      await this.redisService.invalidateAilmentCache(id);
-    }
-    return result;
+    return this.dynamoDBService.deleteItem(id);
   }
 
   private processTreatments(treatments: any[]): Treatment[] {

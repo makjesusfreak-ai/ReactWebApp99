@@ -245,7 +245,6 @@ export default function DataManagementPage() {
             onSaveAilment={handleSaveAilment}
             onDeleteAilment={handleDeleteAilment}
             onRefresh={() => refetch()}
-            loading={loading}
           />
         </div>
       </main>
